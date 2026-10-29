@@ -26,6 +26,7 @@ Priority:
 import csv
 from datetime import datetime
 from enum import Enum
+import re
 
 class Service_Email(Enum):
     SUPPORT = "support@shop.example"
@@ -42,17 +43,10 @@ class EmailPriority(Enum):
 
 # Read CSV Data
 filename = "./orders.csv"
-fields = []  # Column names
 rows = []
 
-with open(filename, 'r') as csvfile:
-    csvreader = csv.reader(csvfile)
-    
-    for row in csvreader:    
-        rows.append(row)
-
-# print (f">>>>>>Order Data:{rows}")
-
+with open(filename, 'r', newline="", encoding="utf-8-sig") as csvfile:
+    rows = list(csv.DictReader(csvfile))
 
 
 # Email Data Reader
@@ -61,7 +55,6 @@ def read_emails(email_file_name: str="email_001"):
     with open(f"./emails/{email_file_name}.txt", "r", encoding="utf-8") as file:
         content = file.read()
         email_lines = content.splitlines()
-        print(email_lines)
         
         # Fetching customer name and email
         customer_name_email = email_lines[0]
@@ -69,13 +62,10 @@ def read_emails(email_file_name: str="email_001"):
         cust_lname = customer_name_email.split()[2]
         cust_email = customer_name_email.split()[len(customer_name_email.split()) - 1]
 
-        # Fetched Order ID from email
-        #TODO: Need to implement a better way to fetch order id from email body
-        order_id = email_lines[7]
+        # Fetch Order ID from email body
+        order_match = re.search(r'\bORD-\d+\b', content, re.IGNORECASE)
+        order_id = order_match.group(0) if order_match else None
 
-        # print(f"Customer Name: {cust_fname} {cust_lname}, Email: {cust_email}, Order ID: {order_id}")
-
-        email_lines = content.splitlines()
     return cust_fname, cust_lname, cust_email, order_id, email_lines
 
 def forward_email_to_service(customer_name, customer_email, order_id, category):
@@ -95,7 +85,7 @@ def forward_email_to_service(customer_name, customer_email, order_id, category):
     subject = f"Customer Support Email - Order ID: {order_id} - Category: {category} - Priority: {priority}"
     current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     mail_body = f"""
-        Hi {service_name},
+        Hi {customer_name},
         We have received an email from {customer_name} ({customer_email}) regarding order ID: {order_id}.
         The email has been classified under the category: {category} with a priority of {priority}.
         Please review and take necessary action.
@@ -109,30 +99,31 @@ def forward_email_to_service(customer_name, customer_email, order_id, category):
         To: {service_email}
         Subject: {subject}
         Date: {current_date}
-        Body:
         {mail_body}
         """
     )
 
 def email_classification(email_content):
-    # Placeholder for email classification logic
-    # This function should analyze the email content and return a category and priority
-    # For now, we will return a dummy category and priority
-    return "ORDER_STATUS", EmailPriority.HIGH.value
+    pass
+    #TODO: Implement email classification logic here. For now, we can return a default category and priority.
 
 if __name__ == "__main__":
     # Read Email
     cust_fname, cust_lname, cust_email, order_id, email_lines = read_emails("email_001")
 
     # Check for order existence
-    order_found = any(order_id in row for row in rows)
+    order_found = any(
+        order_id
+        and row.get("order_id", "").strip().upper() == order_id.upper()
+        for row in rows
+    )
 
-    if order_found:
-        # Email Classification
-        category, priority = email_classification(email_lines)
+     # Keep category and priority constant for now
+    category = "PAYMENT"
+    priority = EmailPriority.HIGH.value
 
-        # Forward Email to Service Team
-        forward_email_to_service(f"{cust_fname} {cust_lname}", cust_email, order_id, category)
+    # Forward Email to Service Team
+    forward_email_to_service(f"{cust_fname} {cust_lname}", cust_email, order_id, category)
 
-    
+
 
